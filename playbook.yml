@@ -1,0 +1,68 @@
+---
+- name: Install and configure Zabbix agent
+  hosts: all
+  become: true
+
+  vars:
+    # Define Zabbix server information
+    zabbix_server:
+      hostname: "my-zabbix-server.example.com"
+      port: "10051"
+      hostname_item_key: "system.hostname"
+      hostname_macro: "{$HOSTNAME}"
+
+  tasks:
+    # Install Zabbix agent
+    - name: Install Zabbix agent
+      apt:
+        name: zabbix-agent
+        state: present
+
+    # Configure Zabbix agent
+    - name: Configure Zabbix agent
+      template:
+        src: templates/zabbix_agentd.conf.j2
+        dest: /etc/zabbix/zabbix_agentd.conf
+      notify: restart zabbix agent
+
+    # Start Zabbix agent
+    - name: Start Zabbix agent
+      service:
+        name: zabbix-agent
+        state: started
+        enabled: yes
+
+  handlers:
+    # Restart Zabbix agent
+    - name: restart zabbix agent
+      service:
+        name: zabbix-agent
+        state: restarted
+
+    # Register server with Zabbix server
+    - name: register server with Zabbix server
+      zabbix_host:
+        server_url: "http://{{ zabbix_server.hostname }}:{{ zabbix_server.port }}/api_jsonrpc.php"
+        login_user: "my_zabbix_user"
+        login_password: "my_zabbix_password"
+        hostname: "{{ zabbix_server.hostname_macro }}"
+        visible_name: "{{ inventory_hostname }}"
+        groups:
+          - "Linux servers"
+        templates:
+          - "Template OS Linux"
+        state: present
+
+    # Add Zabbix agent interface to server
+    - name: add Zabbix agent interface to server
+      zabbix_hostinterface:
+        server_url: "http://{{ zabbix_server.hostname }}:{{ zabbix_server.port }}/api_jsonrpc.php"
+        login_user: "my_zabbix_user"
+        login_password: "my_zabbix_password"
+        hostname: "{{ zabbix_server.hostname_macro }}"
+        ip: "{{ ansible_default_ipv4.address }}"
+        dns: "{{ ansible_hostname }}"
+        port: "the one you want"
+        type: "agent"
+        main: "1"
+        state: present
